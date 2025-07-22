@@ -281,7 +281,7 @@ export function globalErrorHandler(
 // MIDDLEWARE POUR LES ROUTES NON TROUVÉES
 // ========================================
 
-export function notFoundHandler(req: Request, res: Response, next: NextFunction): void {
+export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
   const error = new NotFoundError(`Route ${req.method} ${req.path}`);
   next(error);
 }
@@ -325,4 +325,3 @@ export default {
   handleDatabaseError,
   handleJWTError,
 };
-

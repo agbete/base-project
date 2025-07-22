@@ -16,7 +16,7 @@ export interface DatabaseConfig {
 }
 
 export function getDatabaseConfig(): DatabaseConfig {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = process.env['DATABASE_URL'];
   
   if (databaseUrl) {
     // Parse DATABASE_URL
@@ -27,7 +27,7 @@ export function getDatabaseConfig(): DatabaseConfig {
       database: url.pathname.slice(1),
       user: url.username,
       password: url.password,
-      ssl: process.env.NODE_ENV === 'production',
+      ssl: process.env['NODE_ENV'] === 'production',
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -36,15 +36,15 @@ export function getDatabaseConfig(): DatabaseConfig {
   
   // Configuration par variables d'environnement individuelles
   return {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'saas_app',
-    user: process.env.DB_USER || 'saas_user',
-    password: process.env.DB_PASSWORD || 'saas_password',
-    ssl: process.env.NODE_ENV === 'production',
-    max: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
-    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000'),
+    host: process.env['DB_HOST'] || 'localhost',
+    port: parseInt(process.env['DB_PORT'] || '5432'),
+    database: process.env['DB_NAME'] || 'saas_app',
+    user: process.env['DB_USER'] || 'saas_user',
+    password: process.env['DB_PASSWORD'] || 'saas_password',
+    ssl: process.env['NODE_ENV'] === 'production',
+    max: parseInt(process.env['DB_MAX_CONNECTIONS'] || '20'),
+    idleTimeoutMillis: parseInt(process.env['DB_IDLE_TIMEOUT'] || '30000'),
+    connectionTimeoutMillis: parseInt(process.env['DB_CONNECTION_TIMEOUT'] || '2000'),
   };
 }
 
@@ -72,7 +72,7 @@ export async function connectDatabase(): Promise<{ pool: Pool }> {
     logger.info('Database connection established successfully');
     
     // Gestion des événements de la pool
-    pool.on('connect', (client) => {
+    pool.on('connect', () => {
       logger.debug('New database client connected');
     });
     
@@ -80,7 +80,7 @@ export async function connectDatabase(): Promise<{ pool: Pool }> {
       logger.error('Database pool error:', err);
     });
     
-    pool.on('remove', (client) => {
+    pool.on('remove', () => {
       logger.debug('Database client removed from pool');
     });
     
@@ -231,4 +231,3 @@ export default {
   queryWithRLS,
   checkDatabaseHealth
 };
-
