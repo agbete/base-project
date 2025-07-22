@@ -46,7 +46,7 @@ declare global {
 }
 
 // Cache pour les informations de tenant
-const tenantCache = new Map<string, { tenant: TenantInfo; expiry: number }>();
+const tenantCache = new Map<string, { tenant: TenantInfo | null; expiry: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Fonction pour récupérer les informations de tenant
@@ -78,10 +78,12 @@ async function getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
         return null;
       }
       
-      tenant = results[0];
+      tenant = results[0] || null;
       
       // Mettre en cache dans Redis (30 minutes)
-      await cacheService.set(cacheKey, tenant, 30 * 60);
+      if (tenant) {
+        await cacheService.set(cacheKey, tenant, 30 * 60);
+      }
     }
     
     // Mettre en cache en mémoire
@@ -201,7 +203,7 @@ function getTenantIdFromRequest(req: Request): string | null {
   }
   
   // 2. Query parameter
-  const queryTenantId = req.query.tenantId as string;
+  const queryTenantId = req.query['tenantId'] as string;
   if (queryTenantId) {
     return queryTenantId;
   }
@@ -216,7 +218,7 @@ function getTenantIdFromRequest(req: Request): string | null {
   }
   
   // 4. Path parameter (ex: /api/tenants/:tenantId/...)
-  const pathTenantId = req.params.tenantId;
+  const pathTenantId = req.params['tenantId'];
   if (pathTenantId) {
     return pathTenantId;
   }
@@ -253,7 +255,7 @@ async function configureTenantRLS(req: Request, tenantId: string): Promise<void>
 
 // Middleware pour vérifier les permissions de service
 export const requireService = (serviceName: string) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       const tenant = req.tenant;
       
@@ -387,7 +389,7 @@ export const superAdminTenantMiddleware = async (
 };
 
 // Fonction utilitaire pour nettoyer les connexions DB
-export const cleanupTenantMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+export const cleanupTenantMiddleware = (req: Request, _res: Response, next: NextFunction): void => {
   // Nettoyer la connexion DB si elle existe
   const client = (req as any).dbClient;
   if (client) {
@@ -406,4 +408,3 @@ export default {
   cleanupTenantMiddleware,
   invalidateTenantCache,
 };
-
