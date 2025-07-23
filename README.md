@@ -1,246 +1,339 @@
-# 🚀 Application Web Multi-Entreprise (SaaS)
+# 🚀 Multi-Tenant SaaS Application
 
-Une application web moderne multi-entreprise avec architecture microservices, isolation complète des données et système de permissions granulaires.
+Une application SaaS multi-entreprise moderne avec architecture microservices, isolation complète des données et système de permissions granulaires.
 
-## 🏗️ Architecture
+## 📋 Fonctionnalités
 
-### Stack Technologique
-- **Frontend** : Next.js 14+ (App Router) + TypeScript + Tailwind CSS + Shadcn/ui
-- **Backend** : Node.js + Express.js + TypeScript
-- **Base de données** : PostgreSQL avec Row Level Security (RLS)
-- **Cache** : Redis pour sessions et données fréquentes
-- **Authentification** : JWT + 2FA avec QR codes
-- **File d'attente** : Bull Queue pour les tâches asynchrones
+### ✅ Architecture Multi-Tenant
+- Isolation parfaite des données avec Row Level Security (RLS)
+- Gestion des entreprises avec paramètres personnalisés
+- Sélecteur d'entreprise pour les super administrateurs
 
-### Services Disponibles
-```typescript
-const availableServices = {
-  'auth': { required: true, description: 'Service d\'authentification' },
-  'users': { required: true, description: 'Gestion des utilisateurs' },
-  'settings': { required: true, description: 'Paramètres système' },
-  'crm': { required: false, description: 'Gestion clients/prospects' },
-  'inventory': { required: false, description: 'Gestion des stocks' },
-  'invoicing': { required: false, description: 'Facturation' },
-  'reporting': { required: false, description: 'Rapports et analytics' }
-};
-```
+### 🔐 Authentification & Sécurité
+- Authentification JWT avec refresh tokens
+- 2FA/MFA obligatoire avec QR codes
+- Codes de sauvegarde et SMS backup
+- Protection CSRF et rate limiting
+- Audit trail complet
 
-## 🚀 Installation et Démarrage
+### 👥 Gestion des Utilisateurs & Permissions
+- Système de permissions granulaires (`service.table.action`)
+- Rôles personnalisables par entreprise
+- Interface de gestion des permissions intuitive
+- Hiérarchie des rôles avec héritage
+
+### ⚙️ Système de Paramètres à 3 Niveaux
+1. **Paramètres Système** (Super Admin uniquement)
+2. **Paramètres Entreprise** (Branding, services actifs, règles métier)
+3. **Paramètres Utilisateur** (Thème, langue, notifications)
+
+### 📊 DataTables Enrichies
+- Pagination configurable
+- Recherche globale temps réel
+- Tri multi-colonnes
+- Filtres avancés avec constructeur visuel
+- Actions en lot avec confirmation
+- Export (CSV, Excel, PDF)
+
+### 🏷️ Générateur de Codes Automatique
+- Configuration par entité (`clients`, `invoices`, etc.)
+- Modes manuel/automatique
+- Patterns personnalisables (préfixe, séquence, suffixe)
+- Aperçu en temps réel
+
+### 🌍 Multi-Langues & Localisation
+- Support i18n par entreprise
+- Labels personnalisés
+- Formats régionaux automatiques
+- Gestion des devises et fuseaux horaires
+
+### 📱 PWA Offline-First
+- Service Worker pour cache intelligent
+- Synchronisation différée
+- Gestion des conflits
+- Mode hors-ligne avec indicateur visuel
+
+### ⚡ Protection "Noisy Neighbors"
+- Rate limiting par entreprise
+- Quotas de ressources configurables
+- File d'attente priorisée par plan
+- Monitoring des performances
+
+## 🛠️ Stack Technologique
+
+### Frontend
+- **Next.js 14+** avec App Router
+- **TypeScript** pour la sécurité des types
+- **Tailwind CSS** pour le styling
+- **Shadcn/ui** pour les composants
+
+### Backend
+- **Node.js + Express.js** avec TypeScript
+- **PostgreSQL 15** avec Row Level Security
+- **Redis** pour le cache et les sessions
+- **Bull Queue** pour les tâches asynchrones
+
+### Infrastructure
+- **Docker & Docker Compose** pour le déploiement
+- **Nginx** comme reverse proxy
+- **pgAdmin** pour la gestion de base de données
+- **Redis Commander** pour la gestion Redis
+
+## 🚀 Déploiement Rapide avec Docker
 
 ### Prérequis
-- Node.js 18+
-- Docker et Docker Compose
-- PostgreSQL 15+
-- Redis 7+
+- Docker 20.10+
+- Docker Compose 2.0+
+- 4GB RAM minimum
+- 10GB espace disque
 
-### Installation Rapide
+### 1. Cloner le Projet
 ```bash
-# Cloner le repository
 git clone <repository-url>
-cd base-project
-
-# Démarrer avec Docker
-docker-compose up -d
-
-# L'application sera disponible sur :
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:3001
-# Base de données: localhost:5432
-# Redis: localhost:6379
+cd multi-tenant-saas
 ```
 
-### Installation Manuelle
-
-#### 1. Base de données
+### 2. Déploiement Automatique
 ```bash
-# Créer la base de données
-createdb saas_app
+# Déploiement simple
+./deploy.sh
 
+# Avec monitoring (pgAdmin + Redis Commander)
+./deploy.sh --with-monitoring
+
+# Avec Nginx reverse proxy
+./deploy.sh --with-nginx
+
+# Déploiement complet
+./deploy.sh --with-monitoring --with-nginx
+```
+
+### 3. Accès aux Services
+
+#### 🌐 Application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001
+- **Health Check**: http://localhost:3001/health
+
+#### 🔧 Outils de Gestion
+- **pgAdmin**: http://localhost:8080
+- **Redis Commander**: http://localhost:8081
+
+#### 👤 Comptes de Démonstration
+| Entreprise | Email | Mot de passe | Rôle |
+|------------|-------|--------------|------|
+| Super Admin | superadmin@saas-app.com | password123 | Super Admin |
+| Acme Corp | admin@acme-corp.com | password123 | Admin |
+| TechStart | admin@techstart.com | password123 | Admin |
+| Global Ent | admin@global-enterprises.com | password123 | Admin |
+
+## 🔧 Commandes Docker Utiles
+
+### Gestion des Services
+```bash
+# Voir les logs
+docker-compose logs -f [service]
+
+# Redémarrer un service
+docker-compose restart [service]
+
+# Arrêter tous les services
+docker-compose down
+
+# Arrêter et supprimer les volumes
+docker-compose down -v
+
+# Reconstruire les images
+docker-compose build --no-cache
+```
+
+### Gestion de la Base de Données
+```bash
 # Exécuter les migrations
-cd database
-psql -d saas_app -f migrations/001_create_companies.sql
-psql -d saas_app -f migrations/002_create_users.sql
-# ... autres migrations
+docker-compose --profile migration run --rm migrator
 
-# Charger les données de test
-psql -d saas_app -f seeds/companies.sql
-psql -d saas_app -f seeds/users.sql
+# Accès direct à PostgreSQL
+docker-compose exec postgres psql -U saas_user -d saas_app
+
+# Backup de la base de données
+docker-compose exec postgres pg_dump -U saas_user saas_app > backup.sql
+
+# Restaurer la base de données
+docker-compose exec -T postgres psql -U saas_user saas_app < backup.sql
 ```
 
-#### 2. Backend
+### Monitoring et Debug
 ```bash
-cd backend
-npm install
-cp .env.example .env
-# Configurer les variables d'environnement
-npm run dev
+# Voir l'état des services
+docker-compose ps
+
+# Voir l'utilisation des ressources
+docker stats
+
+# Accéder au shell d'un container
+docker-compose exec [service] sh
+
+# Voir les logs en temps réel
+docker-compose logs -f --tail=100
 ```
 
-#### 3. Frontend
-```bash
-cd frontend
-npm install
-cp .env.local.example .env.local
-# Configurer les variables d'environnement
-npm run dev
-```
-
-## 🔐 Fonctionnalités Principales
-
-### Authentification & Sécurité
-- ✅ Connexion/déconnexion sécurisée
-- ✅ 2FA/MFA obligatoire avec QR codes
-- ✅ Récupération mot de passe par email
-- ✅ Sessions JWT avec refresh tokens
-- ✅ Protection CSRF et rate limiting
-
-### Multi-Entreprise
-- ✅ Isolation complète des données (RLS)
-- ✅ Sélecteur d'entreprise pour super admin
-- ✅ Paramètres par entreprise (branding, services)
-- ✅ Quotas et limites configurables
-
-### Permissions Granulaires
-- ✅ Format `service.table.action`
-- ✅ Rôles prédéfinis et personnalisés
-- ✅ Interface de gestion intuitive
-- ✅ Validation automatique des accès
-
-### Interface Utilisateur
-- ✅ Design responsive mobile-first
-- ✅ Thème adaptatif (clair/sombre)
-- ✅ DataTables avec filtres avancés
-- ✅ Composants réutilisables Shadcn/ui
-
-### Fonctionnalités Avancées
-- ✅ Générateur de codes automatique
-- ✅ Multi-langues par entreprise
-- ✅ PWA avec support offline
-- ✅ Système de paramètres à 3 niveaux
-
-## 📊 Structure du Projet
+## 📁 Structure du Projet
 
 ```
-project/
-├── frontend/                 # Application Next.js 14+
-│   ├── app/                 # App Router pages
-│   ├── components/          # Composants réutilisables
-│   ├── lib/                 # Utilitaires et configurations
-│   └── public/              # Assets statiques
-├── backend/                 # API Node.js + Express
-│   ├── services/            # Services métier
-│   ├── middleware/          # Middlewares Express
-│   ├── routes/              # Routes API
-│   └── utils/               # Utilitaires
-├── database/                # Base de données
-│   ├── migrations/          # Migrations SQL
-│   └── seeds/               # Données de test
-├── docker/                  # Configuration Docker
-└── docs/                    # Documentation
+multi-tenant-saas/
+├── frontend/                 # Application Next.js
+│   ├── src/
+│   │   ├── app/             # App Router pages
+│   │   ├── components/      # Composants réutilisables
+│   │   ├── lib/            # Utilitaires et configurations
+│   │   └── types/          # Types TypeScript
+│   └── Dockerfile
+├── backend/                  # API Node.js/Express
+│   ├── src/
+│   │   ├── controllers/    # Contrôleurs API
+│   │   ├── middleware/     # Middlewares
+│   │   ├── models/         # Modèles de données
+│   │   ├── routes/         # Routes API
+│   │   ├── services/       # Services métier
+│   │   └── utils/          # Utilitaires
+│   └── Dockerfile
+├── database/                 # Migrations et scripts DB
+│   ├── migrations/         # Migrations SQL
+│   ├── migrate.js          # Script de migration
+│   └── Dockerfile
+├── docker/                   # Configuration Docker
+│   ├── nginx/              # Configuration Nginx
+│   └── redis/              # Configuration Redis
+├── docker-compose.yml        # Orchestration Docker
+├── deploy.sh                 # Script de déploiement
+└── README.md
 ```
-
-## 🔧 Configuration
-
-### Variables d'Environnement
-
-#### Backend (.env)
-```env
-# Base de données
-DATABASE_URL=postgresql://user:password@localhost:5432/saas_app
-REDIS_URL=redis://localhost:6379
-
-# JWT
-JWT_SECRET=your-super-secret-jwt-key
-JWT_REFRESH_SECRET=your-super-secret-refresh-key
-
-# Email (pour 2FA et récupération)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-
-# 2FA
-TOTP_SERVICE_NAME=SaaS App
-TOTP_ISSUER=Your Company
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-```
-
-#### Frontend (.env.local)
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_APP_NAME=SaaS App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-## 🧪 Tests
-
-```bash
-# Backend
-cd backend
-npm test
-npm run test:coverage
-
-# Frontend
-cd frontend
-npm test
-npm run test:e2e
-```
-
-## 📈 Performance
-
-- **Temps de réponse** : < 200ms pour les requêtes standard
-- **Couverture de tests** : > 80% du backend
-- **Sécurité** : Audit automatisé sans failles critiques
-- **Mobile** : Interface parfaitement responsive
-- **PWA** : Fonctionnement offline vérifié
 
 ## 🔒 Sécurité
 
-### Mesures Implémentées
-- Row Level Security (RLS) PostgreSQL
+### Authentification
+- JWT avec rotation des tokens
+- 2FA obligatoire avec TOTP
+- Codes de sauvegarde chiffrés
+- Protection contre le brute force
+
+### Isolation des Données
+- Row Level Security (RLS) sur PostgreSQL
 - Validation stricte des accès cross-tenant
-- Protection contre les attaques CSRF
-- Rate limiting par entreprise
+- Audit trail complet des actions
 - Chiffrement des données sensibles
-- Audit trail complet
 
-### Quotas et Limites
-- CPU : Max 20% par entreprise
-- RAM : Limites par plan tarifaire
-- Stockage : Quotas configurables
-- Requêtes : Rate limiting intelligent
+### Protection Réseau
+- Rate limiting par IP et par entreprise
+- Protection CSRF
+- Headers de sécurité HTTP
+- Validation stricte des entrées
 
-## 📚 Documentation
+## 📊 Monitoring et Observabilité
 
-- [Guide d'Installation](docs/installation.md)
-- [Documentation API](docs/api.md)
-- [Guide Administrateur](docs/admin.md)
-- [Architecture Technique](docs/architecture.md)
-- [Guide de Développement](docs/development.md)
+### Métriques Disponibles
+- Performance des requêtes
+- Utilisation des ressources par tenant
+- Taux d'erreur et latence
+- Activité utilisateur
 
-## 🤝 Contribution
+### Logs Structurés
+- Logs applicatifs avec Winston
+- Logs d'audit pour compliance
+- Logs de sécurité pour détection d'intrusion
+- Corrélation des logs par tenant
 
-1. Fork le projet
-2. Créer une branche feature (`git checkout -b feature/amazing-feature`)
-3. Commit les changements (`git commit -m 'Add amazing feature'`)
-4. Push vers la branche (`git push origin feature/amazing-feature`)
-5. Ouvrir une Pull Request
+## 🔧 Configuration Avancée
+
+### Variables d'Environnement
+Copiez `.env.docker` vers `.env` et modifiez selon vos besoins :
+
+```bash
+# Application
+APP_NAME=Mon SaaS
+APP_URL=https://mon-saas.com
+
+# Base de données
+DB_PASSWORD=mot_de_passe_securise
+
+# JWT
+JWT_SECRET=cle_secrete_32_caracteres_minimum
+
+# Email
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=noreply@mon-saas.com
+SMTP_PASS=mot_de_passe_app
+```
+
+### SSL/HTTPS
+Pour activer HTTPS en production :
+
+1. Placez vos certificats dans `docker/nginx/ssl/`
+2. Décommentez la configuration HTTPS dans `docker/nginx/conf.d/default.conf`
+3. Redémarrez Nginx : `docker-compose restart nginx`
+
+### Scaling Horizontal
+Pour gérer plus de charge :
+
+```bash
+# Augmenter le nombre d'instances backend
+docker-compose up -d --scale backend=3
+
+# Utiliser un load balancer externe
+# Configurer Redis Cluster pour la haute disponibilité
+# Utiliser PostgreSQL avec réplication
+```
+
+## 🐛 Dépannage
+
+### Problèmes Courants
+
+#### Services qui ne démarrent pas
+```bash
+# Vérifier les logs
+docker-compose logs [service]
+
+# Vérifier l'état des services
+docker-compose ps
+
+# Redémarrer les services
+docker-compose restart
+```
+
+#### Problèmes de base de données
+```bash
+# Vérifier la connexion
+docker-compose exec postgres pg_isready
+
+# Réinitialiser la base de données
+docker-compose down -v
+docker-compose up -d postgres
+docker-compose --profile migration run --rm migrator
+```
+
+#### Problèmes de permissions
+```bash
+# Vérifier les politiques RLS
+docker-compose exec postgres psql -U saas_user -d saas_app -c "SELECT * FROM validate_tenant_isolation();"
+
+# Réinitialiser les permissions
+docker-compose --profile migration run --rm migrator rollback 1
+docker-compose --profile migration run --rm migrator
+```
+
+## 📞 Support
+
+Pour obtenir de l'aide :
+
+1. Consultez les logs : `docker-compose logs -f`
+2. Vérifiez la documentation des services
+3. Ouvrez une issue sur le repository
 
 ## 📄 Licence
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
-## 🆘 Support
-
-Pour toute question ou problème :
-- 📧 Email : support@yourcompany.com
-- 📖 Documentation : [docs.yourcompany.com](https://docs.yourcompany.com)
-- 🐛 Issues : [GitHub Issues](https://github.com/yourcompany/base-project/issues)
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ---
 
-**Développé avec ❤️ pour une expérience SaaS exceptionnelle**
+**🎉 Félicitations ! Votre application SaaS multi-tenant est maintenant déployée et prête à l'emploi !**
 

@@ -1,69 +1,134 @@
+# ========================================
+# Docker Compose for Multi-Tenant SaaS Application
+# ========================================
+
 version: '3.8'
 
 services:
-  # Base de données PostgreSQL
+  # ========================================
+  # PostgreSQL Database
+  # ========================================
   postgres:
     image: postgres:15-alpine
     container_name: saas_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: saas_app
-      POSTGRES_USER: saas_user
-      POSTGRES_PASSWORD: saas_password
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${DB_NAME:-saas_app}
+      POSTGRES_USER: ${DB_USER:-saas_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-saas_password}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=peer"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "${DB_PORT:-5432}:5432"
     networks:
       - saas_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U saas_user -d saas_app"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-saas_user} -d ${DB_NAME:-saas_app}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
 
-  # Cache Redis
+  # ========================================
+  # Redis Cache
+  # ========================================
   redis:
     image: redis:7-alpine
     container_name: saas_redis
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
     volumes:
       - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - saas_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+      start_period: 30s
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-redis_password}
 
+  # ========================================
   # Backend API
+  # ========================================
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: production
     container_name: saas_backend
+    restart: unless-stopped
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://saas_user:saas_password@postgres:5432/saas_app
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
-      SMTP_USER: your-email@gmail.com
-      SMTP_PASS: your-app-password
-      TOTP_SERVICE_NAME: SaaS App
-      TOTP_ISSUER: Your Company
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
-      PORT: 3001
-    ports:
-      - "3001:3001"
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${BACKEND_PORT:-3001}
+      
+      # Database
+      DATABASE_URL: postgresql://${DB_USER:-saas_user}:${DB_PASSWORD:-saas_password}@postgres:5432/${DB_NAME:-saas_app}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-saas_app}
+      DB_USER: ${DB_USER:-saas_user}
+      DB_PASSWORD: ${DB_PASSWORD:-saas_password}
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      
+      # Security
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      
+      # Email (optional)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@saas-app.com}
+      
+      # Application
+      APP_NAME: ${APP_NAME:-Multi-Tenant SaaS}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:3001}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend/logs:/app/logs
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
     networks:
       - saas_network
     depends_on:
@@ -72,96 +137,156 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
+      start_period: 40s
 
+  # ========================================
   # Frontend Next.js
+  # ========================================
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: runner
     container_name: saas_frontend
+    restart: unless-stopped
     environment:
-      NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_APP_NAME: SaaS App
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-    ports:
-      - "3000:3000"
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_APP_NAME: ${APP_NAME:-Multi-Tenant SaaS}
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3000}
+      
+      # Internal API URL (server-side)
+      API_URL: http://backend:3001
+      
+      # NextJS specific
+      NEXTAUTH_URL: ${APP_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-nextauth-secret-change-in-production}
+      
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - ./frontend/logs:/app/logs
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
     networks:
       - saas_network
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
+      start_period: 40s
 
-  # Worker pour les tâches asynchrones
-  worker:
+  # ========================================
+  # Database Migration Service
+  # ========================================
+  migrator:
     build:
-      context: ./backend
+      context: ./database
       dockerfile: Dockerfile
-    container_name: saas_worker
+    container_name: saas_migrator
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://saas_user:saas_password@postgres:5432/saas_app
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
-      SMTP_USER: your-email@gmail.com
-      SMTP_PASS: your-app-password
-    command: npm run worker
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-saas_app}
+      DB_USER: ${DB_USER:-saas_user}
+      DB_PASSWORD: ${DB_PASSWORD:-saas_password}
     networks:
       - saas_network
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+    profiles:
+      - migration
+    command: ["node", "migrate.js", "run"]
 
-  # Nginx pour le reverse proxy (production)
+  # ========================================
+  # Nginx Reverse Proxy (Optional)
+  # ========================================
   nginx:
     image: nginx:alpine
     container_name: saas_nginx
-    ports:
-      - "80:80"
-      - "443:443"
+    restart: unless-stopped
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
       - ./docker/nginx/ssl:/etc/nginx/ssl
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     networks:
       - saas_network
     depends_on:
       - frontend
       - backend
     profiles:
-      - production
+      - nginx
 
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
+  # ========================================
+  # Monitoring Services (Optional)
+  # ========================================
+  
+  # Redis Commander (Redis GUI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: saas_redis_commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-redis_password}
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin}
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
+    networks:
+      - saas_network
+    depends_on:
+      - redis
+    profiles:
+      - monitoring
 
+  # pgAdmin (PostgreSQL GUI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: saas_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@saas-app.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT:-8080}:80"
+    networks:
+      - saas_network
+    depends_on:
+      - postgres
+    profiles:
+      - monitoring
+
+# ========================================
+# Networks
+# ========================================
 networks:
   saas_network:
     driver: bridge
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
 

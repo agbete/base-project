@@ -111,7 +111,7 @@ export function errorHandler(
   };
 
   // Ajouter des détails en développement
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env['NODE_ENV'] === 'development') {
     errorResponse.error.stack = error.stack;
     if (error.details) {
       errorResponse.error.details = error.details;
@@ -265,12 +265,12 @@ export function globalErrorHandler(
   } else {
     // Erreur inconnue
     processedError = new AppError(
-      process.env.NODE_ENV === 'production' 
+      process.env['NODE_ENV'] === 'production' 
         ? 'Internal server error' 
         : error.message || 'Unknown error',
       500,
       'INTERNAL_ERROR',
-      process.env.NODE_ENV === 'development' ? { originalError: error } : undefined
+      process.env['NODE_ENV'] === 'development' ? { originalError: error } : undefined
     );
   }
 
@@ -281,7 +281,7 @@ export function globalErrorHandler(
 // MIDDLEWARE POUR LES ROUTES NON TROUVÉES
 // ========================================
 
-export function notFoundHandler(req: Request, res: Response, next: NextFunction): void {
+export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
   const error = new NotFoundError(`Route ${req.method} ${req.path}`);
   next(error);
 }
@@ -325,4 +325,3 @@ export default {
   handleDatabaseError,
   handleJWTError,
 };
-

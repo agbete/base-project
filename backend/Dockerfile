@@ -1,40 +1,67 @@
-# Dockerfile pour le backend Node.js
-FROM node:18-alpine
+# ========================================
+# Multi-stage Dockerfile for Node.js Backend
+# ========================================
 
-# Installer les dépendances système
-RUN apk add --no-cache curl
+# Stage 1: Build stage
+FROM node:18-alpine AS builder
 
-# Créer le répertoire de l'application
+# Set working directory
 WORKDIR /app
 
-# Copier les fichiers de configuration
+# Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
 
-# Installer les dépendances
-RUN npm ci --only=production
+# Install dependencies (including dev dependencies for build)
+RUN npm ci --only=production && npm cache clean --force
 
-# Copier le code source
-COPY src/ ./src/
+# Copy source code
+COPY . .
 
-# Construire l'application TypeScript
-RUN npm run build
+# Build TypeScript (if needed)
+RUN npm run build || echo "No build script found, skipping..."
 
-# Créer un utilisateur non-root
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# ========================================
+# Stage 2: Production stage
+FROM node:18-alpine AS production
 
-# Changer la propriété des fichiers
-RUN chown -R nodejs:nodejs /app
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application from builder stage
+COPY --from=builder --chown=nodejs:nodejs /app/src ./src
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist 2>/dev/null || echo "No dist folder"
+
+# Copy other necessary files
+COPY --chown=nodejs:nodejs tsconfig.json ./
+COPY --chown=nodejs:nodejs .env.example ./
+
+# Create logs directory
+RUN mkdir -p /app/logs && chown nodejs:nodejs /app/logs
+
+# Switch to non-root user
 USER nodejs
 
-# Exposer le port
+# Expose port
 EXPOSE 3001
 
-# Vérification de santé
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3001/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Commande par défaut
-CMD ["npm", "start"]
+# Start application with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "start"]
 

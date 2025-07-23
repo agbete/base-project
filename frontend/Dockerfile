@@ -1,59 +1,77 @@
-# Dockerfile pour le frontend Next.js
-FROM node:18-alpine AS base
+# ========================================
+# Multi-stage Dockerfile for Next.js Frontend
+# ========================================
 
-# Installer les dépendances système
-RUN apk add --no-cache libc6-compat curl
+# Stage 1: Dependencies
+FROM node:18-alpine AS deps
+RUN apk add --no-cache libc6-compat
 
-# Étape de construction des dépendances
-FROM base AS deps
 WORKDIR /app
 
-# Copier les fichiers de configuration
+# Copy package files
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --frozen-lockfile
 
-# Étape de construction de l'application
-FROM base AS builder
+# ========================================
+# Stage 2: Builder
+FROM node:18-alpine AS builder
+
 WORKDIR /app
+
+# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code
 COPY . .
 
-# Variables d'environnement pour le build
+# Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
 
-# Construire l'application
+# Build the application
 RUN npm run build
 
-# Étape de production
-FROM base AS runner
+# ========================================
+# Stage 3: Runner
+FROM node:18-alpine AS runner
+
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
 
-# Créer un utilisateur non-root
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create nextjs user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copier les fichiers nécessaires
+# Copy built application
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
 
-# Copier les fichiers de build avec les bonnes permissions
+# Copy built Next.js application
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Create logs directory
+RUN mkdir -p /app/logs && chown nextjs:nodejs /app/logs
+
+# Switch to non-root user
 USER nextjs
 
-# Exposer le port
+# Expose port
 EXPOSE 3000
 
+# Set environment variables
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Vérification de santé
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Commande par défaut
+# Start application
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
 

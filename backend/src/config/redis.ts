@@ -1,7 +1,7 @@
-import Redis from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { logger } from '@/utils/logger';
 
-let redisClient: Redis.RedisClientType | null = null;
+let redisClient: RedisClientType | null = null;
 
 export interface RedisConfig {
   url?: string;
@@ -15,7 +15,7 @@ export interface RedisConfig {
 }
 
 export function getRedisConfig(): RedisConfig {
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = process.env['REDIS_URL'];
   
   if (redisUrl) {
     return {
@@ -26,18 +26,24 @@ export function getRedisConfig(): RedisConfig {
     };
   }
   
-  return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB || '0'),
+  const config: RedisConfig = {
+    host: process.env['REDIS_HOST'] || 'localhost',
+    port: parseInt(process.env['REDIS_PORT'] || '6379'),
+    db: parseInt(process.env['REDIS_DB'] || '0'),
     retryDelayOnFailover: 100,
     maxRetriesPerRequest: 3,
     lazyConnect: true,
   };
+  
+  const password = process.env['REDIS_PASSWORD'];
+  if (password) {
+    config.password = password;
+  }
+  
+  return config;
 }
 
-export async function connectRedis(): Promise<Redis.RedisClientType> {
+export async function connectRedis(): Promise<RedisClientType> {
   if (redisClient && redisClient.isOpen) {
     return redisClient;
   }
@@ -45,7 +51,7 @@ export async function connectRedis(): Promise<Redis.RedisClientType> {
   try {
     const config = getRedisConfig();
     
-    redisClient = Redis.createClient({
+    redisClient = createClient({
       ...config,
       socket: {
         reconnectStrategy: (retries) => {
@@ -102,7 +108,7 @@ export async function disconnectRedis(): Promise<void> {
   }
 }
 
-export function getRedisClient(): Redis.RedisClientType {
+export function getRedisClient(): RedisClientType {
   if (!redisClient || !redisClient.isOpen) {
     throw new Error('Redis not connected. Call connectRedis() first.');
   }
@@ -114,9 +120,9 @@ export function getRedisClient(): Redis.RedisClientType {
 // ========================================
 
 export class CacheService {
-  private client: Redis.RedisClientType;
+  private client: RedisClientType;
   
-  constructor(client: Redis.RedisClientType) {
+  constructor(client: RedisClientType) {
     this.client = client;
   }
   
@@ -174,7 +180,7 @@ export class CacheService {
   async exists(key: string): Promise<boolean> {
     try {
       const result = await this.client.exists(key);
-      return result === 1;
+      return result > 0;
     } catch (error) {
       logger.error('Cache exists error:', { key, error });
       return false;
@@ -185,7 +191,7 @@ export class CacheService {
   async expire(key: string, ttlSeconds: number): Promise<boolean> {
     try {
       const result = await this.client.expire(key, ttlSeconds);
-      return result === 1;
+      return Boolean(result);
     } catch (error) {
       logger.error('Cache expire error:', { key, ttlSeconds, error });
       return false;
@@ -266,7 +272,7 @@ export class SessionService {
   }
   
   // Supprimer toutes les sessions d'un utilisateur
-  async deleteUserSessions(userId: string): Promise<number> {
+  async deleteUserSessions(_userId: string): Promise<number> {
     const pattern = this.prefix + '*';
     return await this.cache.delPattern(pattern);
   }
@@ -388,4 +394,3 @@ export default {
   SessionService,
   RateLimitService
 };
-
