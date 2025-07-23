@@ -1,175 +1,415 @@
 -- ========================================
--- MIGRATION 001: SCHÉMA INITIAL
+-- MIGRATION 001: Initial Schema Setup
+-- Multi-tenant SaaS Application
 -- ========================================
 
--- Activer les extensions nécessaires
+-- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ========================================
--- TABLE: companies (entreprises)
+-- COMPANIES TABLE (Tenant isolation)
 -- ========================================
-
 CREATE TABLE companies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(100) UNIQUE NOT NULL,
-    plan VARCHAR(50) NOT NULL DEFAULT 'basic' CHECK (plan IN ('basic', 'professional', 'enterprise')),
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'inactive')),
-    settings JSONB DEFAULT '{}',
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),
+    address TEXT,
+    logo_url VARCHAR(500),
+    website VARCHAR(255),
+    
+    -- Branding settings
+    primary_color VARCHAR(7) DEFAULT '#3B82F6',
+    secondary_color VARCHAR(7) DEFAULT '#64748B',
+    
+    -- Regional settings
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    currency VARCHAR(3) DEFAULT 'USD',
+    locale VARCHAR(10) DEFAULT 'en-US',
+    date_format VARCHAR(20) DEFAULT 'YYYY-MM-DD',
+    
+    -- Active services (JSON array)
+    active_services JSONB DEFAULT '["auth", "users", "settings"]'::jsonb,
+    
+    -- Business rules and settings
+    business_rules JSONB DEFAULT '{}'::jsonb,
+    
+    -- Subscription and limits
+    plan_type VARCHAR(50) DEFAULT 'basic',
+    max_users INTEGER DEFAULT 10,
+    max_storage_gb INTEGER DEFAULT 5,
+    
+    -- Status
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'cancelled')),
+    
+    -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by UUID,
-    updated_by UUID,
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    deleted_by UUID
+    
+    -- Constraints
+    CONSTRAINT companies_slug_format CHECK (slug ~ '^[a-z0-9-]+$'),
+    CONSTRAINT companies_email_format CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$')
 );
 
--- Index pour les recherches fréquentes
+-- Index for performance
 CREATE INDEX idx_companies_slug ON companies(slug);
 CREATE INDEX idx_companies_status ON companies(status);
-CREATE INDEX idx_companies_plan ON companies(plan);
-CREATE INDEX idx_companies_created_at ON companies(created_at);
 
 -- ========================================
--- TABLE: permissions (permissions système)
+-- USERS TABLE (Multi-tenant with RLS)
 -- ========================================
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    
+    -- Basic info
+    email VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    avatar_url VARCHAR(500),
+    
+    -- Contact info
+    phone VARCHAR(50),
+    
+    -- User preferences
+    language VARCHAR(10) DEFAULT 'en',
+    theme VARCHAR(20) DEFAULT 'system' CHECK (theme IN ('light', 'dark', 'system')),
+    timezone VARCHAR(50),
+    
+    -- 2FA settings
+    two_factor_enabled BOOLEAN DEFAULT FALSE,
+    two_factor_secret VARCHAR(32),
+    backup_codes TEXT[], -- Array of backup codes
+    
+    -- Status and permissions
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+    is_super_admin BOOLEAN DEFAULT FALSE,
+    is_company_admin BOOLEAN DEFAULT FALSE,
+    
+    -- Session management
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    last_activity_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Password management
+    password_changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    password_reset_token VARCHAR(255),
+    password_reset_expires TIMESTAMP WITH TIME ZONE,
+    
+    -- Email verification
+    email_verified BOOLEAN DEFAULT FALSE,
+    email_verification_token VARCHAR(255),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT users_email_company_unique UNIQUE (email, company_id),
+    CONSTRAINT users_email_format CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$')
+);
 
+-- Indexes for performance
+CREATE INDEX idx_users_company_id ON users(company_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_status ON users(status);
+CREATE INDEX idx_users_last_activity ON users(last_activity_at);
+
+-- ========================================
+-- PERMISSIONS TABLE (System-wide)
+-- ========================================
 CREATE TABLE permissions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) UNIQUE NOT NULL,
+    
+    -- Permission structure: service.resource.action
+    service VARCHAR(50) NOT NULL,
+    resource VARCHAR(50) NOT NULL,
+    action VARCHAR(20) NOT NULL CHECK (action IN ('create', 'read', 'update', 'delete', 'list', 'manage')),
+    
+    -- Description and metadata
+    name VARCHAR(255) NOT NULL, -- Human readable name
     description TEXT,
-    service VARCHAR(100) NOT NULL,
-    resource VARCHAR(100) NOT NULL,
-    action VARCHAR(50) NOT NULL,
+    
+    -- Grouping and categorization
+    category VARCHAR(50),
+    is_system BOOLEAN DEFAULT FALSE, -- System permissions cannot be deleted
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT permissions_unique_permission UNIQUE (service, resource, action)
+);
+
+-- Index for performance
+CREATE INDEX idx_permissions_service ON permissions(service);
+CREATE INDEX idx_permissions_category ON permissions(category);
+
+-- ========================================
+-- ROLES TABLE (Company-specific)
+-- ========================================
+CREATE TABLE roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    
+    -- Role info
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    color VARCHAR(7) DEFAULT '#64748B',
+    
+    -- Role type
+    is_system BOOLEAN DEFAULT FALSE, -- System roles cannot be deleted
+    is_default BOOLEAN DEFAULT FALSE, -- Default role for new users
+    
+    -- Permissions (array of permission IDs)
+    permission_ids UUID[] DEFAULT '{}',
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT roles_name_company_unique UNIQUE (name, company_id)
+);
+
+-- Index for performance
+CREATE INDEX idx_roles_company_id ON roles(company_id);
+CREATE INDEX idx_roles_is_default ON roles(is_default);
+
+-- ========================================
+-- USER_ROLES TABLE (Many-to-many)
+-- ========================================
+CREATE TABLE user_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    
+    -- Assignment metadata
+    assigned_by UUID REFERENCES users(id),
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT user_roles_unique UNIQUE (user_id, role_id)
+);
+
+-- Index for performance
+CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+
+-- ========================================
+-- SESSIONS TABLE (JWT and session management)
+-- ========================================
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    
+    -- Session data
+    refresh_token VARCHAR(500) NOT NULL UNIQUE,
+    access_token_jti VARCHAR(100) NOT NULL, -- JWT ID for access token
+    
+    -- Session metadata
+    ip_address INET,
+    user_agent TEXT,
+    device_info JSONB DEFAULT '{}'::jsonb,
+    
+    -- Expiration
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    
+    -- Status
+    is_active BOOLEAN DEFAULT TRUE,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    revoked_reason VARCHAR(100),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for performance
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_sessions_refresh_token ON sessions(refresh_token);
+CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX idx_sessions_is_active ON sessions(is_active);
+
+-- ========================================
+-- AUDIT_LOGS TABLE (Security and compliance)
+-- ========================================
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- Action details
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id UUID,
+    
+    -- Request details
+    method VARCHAR(10),
+    endpoint VARCHAR(255),
+    ip_address INET,
+    user_agent TEXT,
+    
+    -- Data changes
+    old_values JSONB,
+    new_values JSONB,
+    
+    -- Status and result
+    status VARCHAR(20) DEFAULT 'success' CHECK (status IN ('success', 'failure', 'error')),
+    error_message TEXT,
+    
+    -- Timestamp
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for performance and queries
+CREATE INDEX idx_audit_logs_company_id ON audit_logs(company_id);
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+
+-- ========================================
+-- SYSTEM_SETTINGS TABLE (Global settings)
+-- ========================================
+CREATE TABLE system_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Setting identification
+    key VARCHAR(100) NOT NULL UNIQUE,
+    value JSONB NOT NULL,
+    
+    -- Metadata
+    description TEXT,
+    category VARCHAR(50),
+    is_public BOOLEAN DEFAULT FALSE, -- Can be accessed by non-super-admins
+    
+    -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Index pour les recherches par service/ressource/action
-CREATE INDEX idx_permissions_service ON permissions(service);
-CREATE INDEX idx_permissions_resource ON permissions(resource);
-CREATE INDEX idx_permissions_action ON permissions(action);
-CREATE INDEX idx_permissions_service_resource ON permissions(service, resource);
+-- Index for performance
+CREATE INDEX idx_system_settings_key ON system_settings(key);
+CREATE INDEX idx_system_settings_category ON system_settings(category);
 
 -- ========================================
--- TABLE: roles (rôles)
+-- COMPANY_SETTINGS TABLE (Company-specific settings)
 -- ========================================
-
-CREATE TABLE roles (
+CREATE TABLE company_settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-    is_system BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by UUID,
-    updated_by UUID,
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    deleted_by UUID,
-    
-    -- Contrainte unique : nom unique par entreprise (ou système)
-    CONSTRAINT unique_role_name_per_company UNIQUE (name, company_id)
-);
-
--- Index pour les recherches fréquentes
-CREATE INDEX idx_roles_company_id ON roles(company_id);
-CREATE INDEX idx_roles_is_system ON roles(is_system);
-CREATE INDEX idx_roles_name ON roles(name);
-
--- ========================================
--- TABLE: role_permissions (association rôles-permissions)
--- ========================================
-
-CREATE TABLE role_permissions (
-    role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
-    permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    PRIMARY KEY (role_id, permission_id)
-);
-
--- Index pour les recherches inverses
-CREATE INDEX idx_role_permissions_permission_id ON role_permissions(permission_id);
-
--- ========================================
--- TABLE: users (utilisateurs)
--- ========================================
-
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
-    is_super_admin BOOLEAN DEFAULT FALSE,
     
-    -- Authentification à deux facteurs
-    two_factor_enabled BOOLEAN DEFAULT FALSE,
-    two_factor_secret VARCHAR(255),
+    -- Setting identification
+    key VARCHAR(100) NOT NULL,
+    value JSONB NOT NULL,
     
-    -- Gestion des tentatives de connexion
-    failed_login_attempts INTEGER DEFAULT 0,
-    locked_until TIMESTAMP WITH TIME ZONE,
-    last_login_at TIMESTAMP WITH TIME ZONE,
+    -- Metadata
+    description TEXT,
+    category VARCHAR(50),
     
-    -- Réinitialisation de mot de passe
-    reset_token VARCHAR(255),
-    reset_expires TIMESTAMP WITH TIME ZONE,
-    
-    -- Préférences utilisateur
-    preferences JSONB DEFAULT '{}',
-    
-    -- Métadonnées
+    -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_by UUID,
-    updated_by UUID,
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    deleted_by UUID
+    
+    -- Constraints
+    CONSTRAINT company_settings_unique UNIQUE (company_id, key)
 );
 
--- Index pour les recherches fréquentes et RLS
-CREATE INDEX idx_users_company_id ON users(company_id);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role_id ON users(role_id);
-CREATE INDEX idx_users_status ON users(status);
-CREATE INDEX idx_users_reset_token ON users(reset_token);
-CREATE INDEX idx_users_created_at ON users(created_at);
+-- Index for performance
+CREATE INDEX idx_company_settings_company_id ON company_settings(company_id);
+CREATE INDEX idx_company_settings_key ON company_settings(key);
 
 -- ========================================
--- ROW LEVEL SECURITY (RLS)
+-- CODE_GENERATORS TABLE (Auto-generated codes)
 -- ========================================
+CREATE TABLE code_generators (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    
+    -- Generator configuration
+    entity VARCHAR(50) NOT NULL, -- 'clients', 'invoices', etc.
+    mode VARCHAR(20) DEFAULT 'auto' CHECK (mode IN ('manual', 'auto')),
+    
+    -- Pattern configuration
+    prefix VARCHAR(10),
+    sequence_type VARCHAR(20) DEFAULT 'chronological' CHECK (sequence_type IN ('chronological', 'random')),
+    sequence_length INTEGER DEFAULT 6,
+    suffix VARCHAR(20),
+    
+    -- Current state
+    current_number INTEGER DEFAULT 0,
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT code_generators_unique UNIQUE (company_id, entity)
+);
 
--- Activer RLS sur les tables multi-tenant
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
-
--- Créer un rôle pour l'application
-CREATE ROLE app_role;
-
--- Politique RLS pour users : isolation par company_id
-CREATE POLICY tenant_isolation_users ON users
-    FOR ALL TO app_role
-    USING (company_id = current_setting('app.current_tenant', true)::uuid);
-
--- Politique RLS pour roles : isolation par company_id ou rôles système
-CREATE POLICY tenant_isolation_roles ON roles
-    FOR ALL TO app_role
-    USING (
-        company_id = current_setting('app.current_tenant', true)::uuid 
-        OR is_system = true
-    );
+-- Index for performance
+CREATE INDEX idx_code_generators_company_id ON code_generators(company_id);
 
 -- ========================================
--- FONCTIONS UTILITAIRES
+-- GENERATED_CODES TABLE (Track generated codes)
 -- ========================================
+CREATE TABLE generated_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    generator_id UUID NOT NULL REFERENCES code_generators(id) ON DELETE CASCADE,
+    
+    -- Code details
+    entity VARCHAR(50) NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    entity_id UUID, -- Reference to the actual entity
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT generated_codes_unique UNIQUE (company_id, entity, code)
+);
 
--- Fonction pour mettre à jour updated_at automatiquement
+-- Index for performance
+CREATE INDEX idx_generated_codes_company_id ON generated_codes(company_id);
+CREATE INDEX idx_generated_codes_entity ON generated_codes(entity);
+CREATE INDEX idx_generated_codes_code ON generated_codes(code);
+
+-- ========================================
+-- RATE_LIMITS TABLE (Protection against noisy neighbors)
+-- ========================================
+CREATE TABLE rate_limits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    
+    -- Limit configuration
+    resource_type VARCHAR(50) NOT NULL, -- 'api_requests', 'db_queries', 'storage', etc.
+    limit_value INTEGER NOT NULL,
+    window_seconds INTEGER NOT NULL,
+    
+    -- Current usage
+    current_usage INTEGER DEFAULT 0,
+    window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT rate_limits_unique UNIQUE (company_id, resource_type)
+);
+
+-- Index for performance
+CREATE INDEX idx_rate_limits_company_id ON rate_limits(company_id);
+CREATE INDEX idx_rate_limits_resource_type ON rate_limits(resource_type);
+
+-- ========================================
+-- UPDATED_AT TRIGGER FUNCTION
+-- ========================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -178,65 +418,12 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Triggers pour updated_at
-CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_permissions_updated_at BEFORE UPDATE ON permissions
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ========================================
--- FONCTION POUR CONFIGURER RLS
--- ========================================
-
-CREATE OR REPLACE FUNCTION configure_rls_session(tenant_id UUID, user_id UUID DEFAULT NULL)
-RETURNS VOID AS $$
-BEGIN
-    -- Définir le tenant courant
-    PERFORM set_config('app.current_tenant', tenant_id::text, true);
-    
-    -- Définir l'utilisateur courant si fourni
-    IF user_id IS NOT NULL THEN
-        PERFORM set_config('app.current_user', user_id::text, true);
-    END IF;
-    
-    -- Définir le rôle de l'application
-    SET ROLE app_role;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ========================================
--- COMMENTAIRES
--- ========================================
-
-COMMENT ON TABLE companies IS 'Table des entreprises/tenants';
-COMMENT ON TABLE permissions IS 'Permissions système disponibles';
-COMMENT ON TABLE roles IS 'Rôles utilisateur par entreprise';
-COMMENT ON TABLE role_permissions IS 'Association entre rôles et permissions';
-COMMENT ON TABLE users IS 'Utilisateurs du système';
-
-COMMENT ON COLUMN companies.slug IS 'Identifiant unique URL-friendly';
-COMMENT ON COLUMN companies.plan IS 'Plan tarifaire de l''entreprise';
-COMMENT ON COLUMN companies.settings IS 'Configuration JSON de l''entreprise';
-
-COMMENT ON COLUMN permissions.name IS 'Nom unique de la permission (ex: users.create)';
-COMMENT ON COLUMN permissions.service IS 'Service concerné (ex: users, crm)';
-COMMENT ON COLUMN permissions.resource IS 'Ressource concernée (ex: users, clients)';
-COMMENT ON COLUMN permissions.action IS 'Action autorisée (create, read, update, delete)';
-
-COMMENT ON COLUMN roles.is_system IS 'Rôle système (partagé entre toutes les entreprises)';
-
-COMMENT ON COLUMN users.company_id IS 'Entreprise de rattachement (tenant)';
-COMMENT ON COLUMN users.two_factor_secret IS 'Secret TOTP pour l''authentification 2FA';
-COMMENT ON COLUMN users.preferences IS 'Préférences utilisateur en JSON';
-
--- Migration terminée
-INSERT INTO schema_migrations (version, applied_at) VALUES ('001', NOW())
-ON CONFLICT (version) DO NOTHING;
+-- Apply updated_at triggers to relevant tables
+CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_system_settings_updated_at BEFORE UPDATE ON system_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_company_settings_updated_at BEFORE UPDATE ON company_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_code_generators_updated_at BEFORE UPDATE ON code_generators FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_rate_limits_updated_at BEFORE UPDATE ON rate_limits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

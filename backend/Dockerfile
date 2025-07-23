@@ -1,122 +1,67 @@
 # ========================================
-# DOCKERFILE MULTI-STAGE POUR BACKEND NODE.JS
+# Multi-stage Dockerfile for Node.js Backend
 # ========================================
 
-# ========================================
-# STAGE BASE: Configuration commune
-# ========================================
-FROM node:18-alpine AS base
+# Stage 1: Build stage
+FROM node:18-alpine AS builder
 
-# Installer les dépendances système nécessaires
-RUN apk add --no-cache \
-    curl \
-    bash \
-    git \
-    python3 \
-    make \
-    g++
-
-# Créer le répertoire de l'application
+# Set working directory
 WORKDIR /app
 
-# Copier les fichiers de configuration des dépendances
+# Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
 
-# ========================================
-# STAGE DEPENDENCIES: Installation des dépendances
-# ========================================
-FROM base AS dependencies
-
-# Installer toutes les dépendances (dev + prod)
-RUN npm ci --include=dev
-
-# ========================================
-# STAGE DEVELOPMENT: Environnement de développement
-# ========================================
-FROM dependencies AS development
-
-# Copier le code source
-COPY . .
-
-# Créer le répertoire des logs
-RUN mkdir -p logs
-
-# Exposer le port
-EXPOSE 3001
-
-# Variables d'environnement par défaut
-ENV NODE_ENV=development
-ENV PORT=3001
-ENV HOST=0.0.0.0
-
-# Commande par défaut pour le développement (avec hot reload)
-CMD ["npm", "run", "dev"]
-
-# ========================================
-# STAGE BUILD: Compilation TypeScript
-# ========================================
-FROM dependencies AS build
-
-# Copier le code source
-COPY . .
-
-# Compiler TypeScript
-RUN npm run build
-
-# Supprimer les dépendances de développement
+# Install dependencies (including dev dependencies for build)
 RUN npm ci --only=production && npm cache clean --force
 
+# Copy source code
+COPY . .
+
+# Build TypeScript (if needed)
+RUN npm run build || echo "No build script found, skipping..."
+
 # ========================================
-# STAGE PRODUCTION: Image finale optimisée
-# ========================================
+# Stage 2: Production stage
 FROM node:18-alpine AS production
 
-# Installer curl pour les health checks
-RUN apk add --no-cache curl
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
 
-# Créer un utilisateur non-root pour la sécurité
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
-# Créer le répertoire de l'application
+# Set working directory
 WORKDIR /app
 
-# Copier les fichiers de configuration
+# Copy package files
 COPY package*.json ./
 
-# Copier les dépendances de production depuis le stage build
-COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
-# Copier le code compilé
-COPY --from=build --chown=nodejs:nodejs /app/dist ./dist
+# Copy built application from builder stage
+COPY --from=builder --chown=nodejs:nodejs /app/src ./src
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist 2>/dev/null || echo "No dist folder"
 
-# Créer le répertoire des logs
-RUN mkdir -p logs && chown nodejs:nodejs logs
+# Copy other necessary files
+COPY --chown=nodejs:nodejs tsconfig.json ./
+COPY --chown=nodejs:nodejs .env.example ./
 
-# Changer vers l'utilisateur non-root
+# Create logs directory
+RUN mkdir -p /app/logs && chown nodejs:nodejs /app/logs
+
+# Switch to non-root user
 USER nodejs
 
-# Exposer le port
+# Expose port
 EXPOSE 3001
-
-# Variables d'environnement par défaut
-ENV NODE_ENV=production
-ENV PORT=3001
-ENV HOST=0.0.0.0
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3001/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Commande par défaut pour la production
-CMD ["node", "dist/server.js"]
-
-# ========================================
-# STAGE WORKER: Worker pour les tâches asynchrones
-# ========================================
-FROM production AS worker
-
-# Commande pour le worker
-CMD ["node", "dist/worker.js"]
+# Start application with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "start"]
 

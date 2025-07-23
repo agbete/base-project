@@ -35,7 +35,7 @@ interface UpdateRoleRequest {
 
 router.get('/', requirePermission('users.roles.list'), asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.tenantId;
-  const includeSystem = req.query.includeSystem === 'true';
+  const includeSystem = req.query['includeSystem'] === 'true';
   
   let whereClause = 'WHERE (company_id = $1 OR is_system = true)';
   let queryParams = [tenantId];
@@ -511,7 +511,7 @@ router.post('/:id/duplicate', requirePermission('users.roles.create'), asyncHand
 // PERMISSIONS DISPONIBLES
 // ========================================
 
-router.get('/permissions/available', requirePermission('users.roles.read'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/permissions/available', requirePermission('users.roles.read'), asyncHandler(async (_req: Request, res: Response) => {
   const permissions = await query(
     `SELECT 
       id, name, description, service, resource, action
@@ -583,4 +583,3 @@ router.get('/stats/overview', requirePermission('users.roles.list'), asyncHandle
 }));
 
 export default router;
-

@@ -4,15 +4,14 @@ import jwt from 'jsonwebtoken';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
-import { query, transaction } from '@/config/database';
+import { query } from '@/config/database';
 import { getSessionService, getCacheService } from '@/config/redis';
 import { logger, logLoginAttempt, logSecurityEvent } from '@/utils/logger';
 import { authRateLimiter } from '@/middleware/rateLimiter';
-import { optionalAuth, authMiddleware } from '@/middleware/auth';
+import { authMiddleware } from '@/middleware/auth';
 import { 
   ValidationError, 
-  AuthenticationError, 
-  AuthorizationError,
+  AuthenticationError,
   asyncHandler 
 } from '@/middleware/errorHandler';
 
@@ -26,13 +25,12 @@ interface LoginRequest {
   rememberMe?: boolean;
 }
 
-interface RegisterRequest {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  companyName?: string;
+// Configuration JWT
+const jwtSecret = process.env['JWT_SECRET'];
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET environment variable is required');
 }
+const JWT_SECRET: string = jwtSecret;
 
 interface ResetPasswordRequest {
   email: string;
@@ -148,10 +146,6 @@ router.post('/login', authRateLimiter, asyncHandler(async (req: Request, res: Re
     await sessionService.createSession(sessionId, sessionData, sessionTTL);
     
     // Générer les tokens JWT
-    const jwtSecret = process.env['JWT_SECRET'];
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET not configured');
-    }
     
     const tokenPayload = {
       userId: user.id,
@@ -162,14 +156,14 @@ router.post('/login', authRateLimiter, asyncHandler(async (req: Request, res: Re
       sessionId,
     };
     
-    const accessToken = jwt.sign(tokenPayload, jwtSecret, {
+    const accessToken = jwt.sign(tokenPayload, JWT_SECRET, {
       expiresIn: process.env['JWT_EXPIRES_IN'] || '15m',
-    });
+    } as jwt.SignOptions);
     
-    const refreshTokenSecret = process.env['JWT_REFRESH_SECRET'] || jwtSecret;
+    const refreshTokenSecret = process.env['JWT_REFRESH_SECRET'] || JWT_SECRET;
     const refreshToken = jwt.sign(tokenPayload, refreshTokenSecret, {
       expiresIn: process.env['JWT_REFRESH_EXPIRES_IN'] || '7d',
-    });
+    } as jwt.SignOptions);
     
     // Mettre à jour la dernière connexion
     await query(
@@ -246,10 +240,6 @@ router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
     }
     
     // Générer un nouveau token d'accès
-    const jwtSecret = process.env['JWT_SECRET'];
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET not configured');
-    }
     
     const newAccessToken = jwt.sign({
       userId: decoded.userId,
@@ -258,9 +248,9 @@ router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
       roleId: decoded.roleId,
       isSuperAdmin: decoded.isSuperAdmin,
       sessionId: decoded.sessionId,
-    }, jwtSecret, {
+    }, JWT_SECRET, {
       expiresIn: process.env['JWT_EXPIRES_IN'] || '15m',
-    });
+    } as jwt.SignOptions);
     
     res.json({
       success: true,
@@ -633,4 +623,3 @@ async function resetFailedAttempts(userId: string): Promise<void> {
 }
 
 export default router;
-

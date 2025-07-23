@@ -37,7 +37,7 @@ export const rateLimiter = rateLimit({
   },
   
   // Fonction appelée quand la limite est dépassée
-  handler: (req: Request, res: Response) => {
+  handler: (req: Request, _res: Response) => {
     const ip = req.ip || 'unknown';
     logger.warn('Rate limit exceeded', {
       ip,
@@ -83,7 +83,7 @@ export const authRateLimiter = rateLimit({
     return `auth:${ip}:${email}`;
   },
   
-  handler: (req: Request, res: Response) => {
+  handler: (req: Request, _res: Response) => {
     const ip = req.ip || 'unknown';
     const email = req.body?.email || 'unknown';
     
@@ -130,7 +130,7 @@ export const createTenantRateLimiter = (options: RateLimitOptions) => {
       return `tenant:${tenantId}:user:${userId}`;
     },
     
-    handler: (req: Request, res: Response) => {
+    handler: (req: Request, _res: Response) => {
       const tenantId = (req as any).tenant?.id || 'unknown';
       const userId = (req as any).user?.id || 'unknown';
       

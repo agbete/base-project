@@ -8,6 +8,7 @@ import { tenantMiddleware } from '@/middleware/tenant';
 import { 
   ValidationError, 
   NotFoundError,
+  AuthenticationError,
   asyncHandler 
 } from '@/middleware/errorHandler';
 
@@ -118,7 +119,7 @@ interface UserPreferences {
 // PARAMÈTRES SYSTÈME (Super Admin uniquement)
 // ========================================
 
-router.get('/system', requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+router.get('/system', requireSuperAdmin, asyncHandler(async (_req: Request, res: Response) => {
   // Pour cette démo, on retourne des paramètres par défaut
   // En production, ces paramètres seraient stockés en base de données
   const systemSettings: SystemSettings = {
@@ -439,6 +440,10 @@ router.put('/services', requirePermission('settings.company.update'), asyncHandl
   const companyId = req.user?.companyId;
   const updatedBy = req.user?.id;
   
+  if (!companyId) {
+    throw new AuthenticationError('Company ID required');
+  }
+  
   if (!Array.isArray(activeServices)) {
     throw new ValidationError('activeServices must be an array');
   }
@@ -498,7 +503,7 @@ router.put('/services', requirePermission('settings.company.update'), asyncHandl
 // THÈMES ET BRANDING
 // ========================================
 
-router.get('/themes', asyncHandler(async (req: Request, res: Response) => {
+router.get('/themes', asyncHandler(async (_req: Request, res: Response) => {
   const themes = [
     {
       id: 'default',
@@ -551,7 +556,7 @@ router.get('/themes', asyncHandler(async (req: Request, res: Response) => {
 // LANGUES DISPONIBLES
 // ========================================
 
-router.get('/languages', asyncHandler(async (req: Request, res: Response) => {
+router.get('/languages', asyncHandler(async (_req: Request, res: Response) => {
   const languages = [
     { code: 'fr', name: 'Français', nativeName: 'Français', flag: '🇫🇷' },
     { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
@@ -575,7 +580,7 @@ router.get('/languages', asyncHandler(async (req: Request, res: Response) => {
 // FUSEAUX HORAIRES
 // ========================================
 
-router.get('/timezones', asyncHandler(async (req: Request, res: Response) => {
+router.get('/timezones', asyncHandler(async (_req: Request, res: Response) => {
   const timezones = [
     { value: 'Europe/Paris', label: 'Paris (UTC+1)', offset: '+01:00' },
     { value: 'Europe/London', label: 'London (UTC+0)', offset: '+00:00' },
@@ -637,4 +642,3 @@ function getDefaultUserPreferences(): UserPreferences {
 }
 
 export default router;
-

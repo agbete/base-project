@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query } from '@/config/database';
-import { logger } from '@/utils/logger';
+
 import { authMiddleware, requirePermission } from '@/middleware/auth';
 import { tenantMiddleware } from '@/middleware/tenant';
 import { 
@@ -76,7 +76,7 @@ router.get('/', requirePermission('users.permissions.list'), asyncHandler(async 
 // PERMISSIONS GROUPÉES PAR SERVICE
 // ========================================
 
-router.get('/grouped', requirePermission('users.permissions.list'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/grouped', requirePermission('users.permissions.list'), asyncHandler(async (_req: Request, res: Response) => {
   const permissions = await query(
     `SELECT 
       id, name, description, service, resource, action
@@ -125,7 +125,7 @@ router.get('/grouped', requirePermission('users.permissions.list'), asyncHandler
 // SERVICES DISPONIBLES
 // ========================================
 
-router.get('/services', requirePermission('users.permissions.list'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/services', requirePermission('users.permissions.list'), asyncHandler(async (_req: Request, res: Response) => {
   const services = await query(
     `SELECT 
       service,
@@ -267,7 +267,7 @@ router.get('/user/:userId', requirePermission('users.permissions.list'), asyncHa
     return acc;
   }, {});
   
-  res.json({
+  return res.json({
     success: true,
     data: {
       user,
@@ -352,7 +352,7 @@ router.get('/role/:roleId', requirePermission('users.permissions.list'), asyncHa
     return acc;
   }, {});
   
-  res.json({
+  return res.json({
     success: true,
     data: {
       role,
@@ -412,7 +412,7 @@ router.post('/check', requirePermission('users.permissions.list'), asyncHandler(
   const user = userPermissions[0];
   const hasPermission = user.is_super_admin || user.permissions.includes(permission);
   
-  res.json({
+  return res.json({
     success: true,
     data: {
       userId,
@@ -428,7 +428,7 @@ router.post('/check', requirePermission('users.permissions.list'), asyncHandler(
 // STATISTIQUES DES PERMISSIONS
 // ========================================
 
-router.get('/stats/overview', requirePermission('users.permissions.list'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/stats/overview', requirePermission('users.permissions.list'), asyncHandler(async (_req: Request, res: Response) => {
   const stats = await query(
     `SELECT 
       COUNT(*) as total_permissions,
@@ -522,4 +522,3 @@ router.get('/matrix', requirePermission('users.permissions.list'), asyncHandler(
 }));
 
 export default router;
-

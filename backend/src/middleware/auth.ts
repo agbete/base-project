@@ -288,7 +288,7 @@ function extractTokenFromRequest(req: Request): string | null {
   }
   
   // 3. Query parameter (non recommandé, mais supporté)
-  const queryToken = req.query.token as string;
+  const queryToken = req.query['token'] as string;
   if (queryToken) {
     return queryToken;
   }
@@ -298,7 +298,7 @@ function extractTokenFromRequest(req: Request): string | null {
 
 // Middleware pour vérifier les permissions
 export const requirePermission = (permission: string) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       const user = req.user;
       
@@ -343,7 +343,7 @@ export const requirePermission = (permission: string) => {
 
 // Middleware pour vérifier plusieurs permissions (OR)
 export const requireAnyPermission = (permissions: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       const user = req.user;
       
@@ -383,7 +383,7 @@ export const requireAnyPermission = (permissions: string[]) => {
 
 // Middleware pour vérifier toutes les permissions (AND)
 export const requireAllPermissions = (permissions: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       const user = req.user;
       
@@ -426,7 +426,7 @@ export const requireAllPermissions = (permissions: string[]) => {
 
 // Middleware pour vérifier le rôle
 export const requireRole = (roleName: string) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       const user = req.user;
       
@@ -460,7 +460,7 @@ export const requireRole = (roleName: string) => {
 };
 
 // Middleware pour les super admins uniquement
-export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+export const requireSuperAdmin = (req: Request, _res: Response, next: NextFunction): void => {
   try {
     const user = req.user;
     
@@ -488,7 +488,7 @@ export const requireSuperAdmin = (req: Request, res: Response, next: NextFunctio
 // Middleware optionnel (n'échoue pas si pas d'auth)
 export const optionalAuth = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
@@ -532,4 +532,3 @@ export default {
   optionalAuth,
   invalidateUserCache,
 };
-

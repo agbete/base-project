@@ -1,7 +1,7 @@
-import Redis from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { logger } from '@/utils/logger';
 
-let redisClient: Redis.RedisClientType | null = null;
+let redisClient: RedisClientType | null = null;
 
 export interface RedisConfig {
   url?: string;
@@ -43,7 +43,7 @@ export function getRedisConfig(): RedisConfig {
   return config;
 }
 
-export async function connectRedis(): Promise<Redis.RedisClientType> {
+export async function connectRedis(): Promise<RedisClientType> {
   if (redisClient && redisClient.isOpen) {
     return redisClient;
   }
@@ -51,7 +51,7 @@ export async function connectRedis(): Promise<Redis.RedisClientType> {
   try {
     const config = getRedisConfig();
     
-    redisClient = Redis.createClient({
+    redisClient = createClient({
       ...config,
       socket: {
         reconnectStrategy: (retries) => {
@@ -108,7 +108,7 @@ export async function disconnectRedis(): Promise<void> {
   }
 }
 
-export function getRedisClient(): Redis.RedisClientType {
+export function getRedisClient(): RedisClientType {
   if (!redisClient || !redisClient.isOpen) {
     throw new Error('Redis not connected. Call connectRedis() first.');
   }
@@ -120,9 +120,9 @@ export function getRedisClient(): Redis.RedisClientType {
 // ========================================
 
 export class CacheService {
-  private client: Redis.RedisClientType;
+  private client: RedisClientType;
   
-  constructor(client: Redis.RedisClientType) {
+  constructor(client: RedisClientType) {
     this.client = client;
   }
   
@@ -191,7 +191,7 @@ export class CacheService {
   async expire(key: string, ttlSeconds: number): Promise<boolean> {
     try {
       const result = await this.client.expire(key, ttlSeconds);
-      return result === 1;
+      return Boolean(result);
     } catch (error) {
       logger.error('Cache expire error:', { key, ttlSeconds, error });
       return false;

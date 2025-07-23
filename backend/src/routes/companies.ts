@@ -7,6 +7,7 @@ import {
   ValidationError, 
   NotFoundError, 
   ConflictError,
+  AuthenticationError,
   asyncHandler 
 } from '@/middleware/errorHandler';
 
@@ -239,28 +240,37 @@ router.post('/', requireSuperAdmin, asyncHandler(async (req: Request, res: Respo
   }
   
   // Paramètres par défaut
+  const defaultBranding = {
+    primaryColor: '#3B82F6',
+    secondaryColor: '#1E40AF',
+    companyName: name,
+  };
+
+  const defaultQuotas = {
+    maxUsers: plan === 'basic' ? 10 : plan === 'professional' ? 100 : 1000,
+    maxStorage: plan === 'basic' ? '1GB' : plan === 'professional' ? '10GB' : '100GB',
+    maxApiCalls: plan === 'basic' ? 1000 : plan === 'professional' ? 10000 : 100000,
+  };
+
+  const defaultRegional = {
+    timezone: 'Europe/Paris',
+    currency: 'EUR',
+    locale: 'fr-FR',
+    dateFormat: 'DD/MM/YYYY',
+  };
+
   const defaultSettings = {
-    branding: {
-      primaryColor: '#3B82F6',
-      secondaryColor: '#1E40AF',
-      companyName: name,
-      ...settings?.branding,
-    },
+    branding: { ...defaultBranding, ...settings?.branding },
     activeServices: ['auth', 'users', 'settings', ...(settings?.activeServices || [])],
-    quotas: {
-      maxUsers: plan === 'basic' ? 10 : plan === 'professional' ? 100 : 1000,
-      maxStorage: plan === 'basic' ? '1GB' : plan === 'professional' ? '10GB' : '100GB',
-      maxApiCalls: plan === 'basic' ? 1000 : plan === 'professional' ? 10000 : 100000,
-      ...settings?.quotas,
-    },
-    regional: {
-      timezone: 'Europe/Paris',
-      currency: 'EUR',
-      locale: 'fr-FR',
-      dateFormat: 'DD/MM/YYYY',
-      ...settings?.regional,
-    },
-    ...settings,
+    quotas: { ...defaultQuotas, ...settings?.quotas },
+    regional: { ...defaultRegional, ...settings?.regional },
+    // Autres paramètres personnalisés
+    ...(settings && Object.keys(settings).reduce((acc, key) => {
+      if (!['branding', 'activeServices', 'quotas', 'regional'].includes(key)) {
+        acc[key] = (settings as any)[key];
+      }
+      return acc;
+    }, {} as any))
   };
   
   await transaction(async (client) => {
@@ -315,6 +325,10 @@ router.post('/', requireSuperAdmin, asyncHandler(async (req: Request, res: Respo
 
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  
+  if (!id) {
+    throw new ValidationError('Company ID is required');
+  }
   const {
     name,
     slug,
@@ -325,6 +339,10 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   
   const user = req.user;
   const updatedBy = user?.id;
+  
+  if (!updatedBy) {
+    throw new AuthenticationError('User information required');
+  }
   
   // Vérifier les permissions
   const canUpdateCompany = user?.isSuperAdmin || 
@@ -409,7 +427,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     
     updateFields.push(`updated_at = NOW()`);
     updateFields.push(`updated_by = $${paramIndex}`);
-    updateValues.push(updatedBy);
+    updateValues.push(updatedBy!); // Safe because we checked above
     paramIndex++;
     
     // ID pour la clause WHERE
@@ -450,7 +468,15 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 router.delete('/:id', requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  
+  if (!id) {
+    throw new ValidationError('Company ID is required');
+  }
   const deletedBy = req.user?.id;
+  
+  if (!deletedBy) {
+    throw new AuthenticationError('User information required');
+  }
   
   await transaction(async (client) => {
     // Vérifier que l'entreprise existe
@@ -483,7 +509,7 @@ router.delete('/:id', requireSuperAdmin, asyncHandler(async (req: Request, res: 
            deleted_by = $1,
            updated_at = NOW()
        WHERE id = $2`,
-      [deletedBy, id]
+      [deletedBy!, id] // Safe because we checked above
     );
     
     // Invalider le cache
@@ -506,7 +532,7 @@ router.delete('/:id', requireSuperAdmin, asyncHandler(async (req: Request, res: 
 // STATISTIQUES GLOBALES (Super Admin uniquement)
 // ========================================
 
-router.get('/stats/global', requireSuperAdmin, asyncHandler(async (req: Request, res: Response) => {
+router.get('/stats/global', requireSuperAdmin, asyncHandler(async (_req: Request, res: Response) => {
   const stats = await query(
     `SELECT 
       COUNT(*) as total_companies,
@@ -617,4 +643,3 @@ router.put('/current/settings', requirePermission('settings.company.update'), as
 }));
 
 export default router;
-

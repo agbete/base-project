@@ -1,9 +1,12 @@
+import dotenv from 'dotenv';
+// Charger les variables d'environnement en premier
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import 'express-async-errors';
 
 import { errorHandler } from '@/middleware/errorHandler';

@@ -11,12 +11,16 @@ import { logger } from './utils/logger';
 // CONFIGURATION DES QUEUES
 // ========================================
 
-const redisConfig = {
+const redisConfig: any = {
   host: process.env['REDIS_HOST'] || 'localhost',
   port: parseInt(process.env['REDIS_PORT'] || '6379'),
-  password: process.env['REDIS_PASSWORD'],
   db: parseInt(process.env['REDIS_DB'] || '0'),
 };
+
+// Ajouter le mot de passe seulement s'il est défini
+if (process.env['REDIS_PASSWORD']) {
+  redisConfig.password = process.env['REDIS_PASSWORD'];
+}
 
 // Queues pour différents types de tâches
 const emailQueue = new Bull('email processing', { redis: redisConfig });
@@ -30,7 +34,7 @@ const cleanupQueue = new Bull('cleanup tasks', { redis: redisConfig });
 
 // Traitement des emails
 emailQueue.process('send-email', async (job) => {
-  const { to, subject, template, data, companyId } = job.data;
+  const { to, subject, template: _template, data: _data, companyId } = job.data;
   
   logger.info('Processing email job', {
     jobId: job.id,
@@ -66,7 +70,7 @@ emailQueue.process('send-email', async (job) => {
 
 // Traitement des notifications
 notificationQueue.process('send-notification', async (job) => {
-  const { userId, type, title, message, data, companyId } = job.data;
+  const { userId, type, title: _title, message: _message, data: _data, companyId } = job.data;
   
   logger.info('Processing notification job', {
     jobId: job.id,
@@ -102,7 +106,7 @@ notificationQueue.process('send-notification', async (job) => {
 
 // Génération de rapports
 reportQueue.process('generate-report', async (job) => {
-  const { reportType, filters, userId, companyId } = job.data;
+  const { reportType, filters: _filters, userId, companyId } = job.data;
   
   logger.info('Processing report generation job', {
     jobId: job.id,
@@ -345,4 +349,3 @@ export {
 if (require.main === module) {
   startWorker();
 }
-
