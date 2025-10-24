@@ -1,225 +1,290 @@
 # 🚀 Application Web Multi-Entreprise (SaaS)
 
-Une application web moderne multi-entreprise avec architecture microservices, isolation complète des données et système de permissions granulaires.
+Une application SaaS complète avec architecture microservices, isolation multi-tenant et système de permissions granulaires.
 
-## 🏗️ Architecture
+## 📋 Fonctionnalités
 
-### Stack Technologique
-- **Frontend** : Next.js 14+ (App Router) + TypeScript + Tailwind CSS + Shadcn/ui
-- **Backend** : Node.js + Express.js + TypeScript
-- **Base de données** : PostgreSQL avec Row Level Security (RLS)
-- **Cache** : Redis pour sessions et données fréquentes
-- **Authentification** : JWT + 2FA avec QR codes
-- **File d'attente** : Bull Queue pour les tâches asynchrones
+### 🔐 Authentification & Sécurité
+- ✅ Connexion/déconnexion avec JWT
+- ✅ Authentification 2FA avec QR codes
+- ✅ Récupération de mot de passe sécurisée
+- ✅ Protection contre les attaques par force brute
+- ✅ Sessions sécurisées avec Redis
+- ✅ Rate limiting intelligent
 
-### Services Disponibles
-```typescript
-const availableServices = {
-  'auth': { required: true, description: 'Service d\'authentification' },
-  'users': { required: true, description: 'Gestion des utilisateurs' },
-  'settings': { required: true, description: 'Paramètres système' },
-  'crm': { required: false, description: 'Gestion clients/prospects' },
-  'inventory': { required: false, description: 'Gestion des stocks' },
-  'invoicing': { required: false, description: 'Facturation' },
-  'reporting': { required: false, description: 'Rapports et analytics' }
-};
-```
+### 🏢 Multi-Tenant
+- ✅ Isolation complète des données par entreprise
+- ✅ Row Level Security (RLS) PostgreSQL
+- ✅ Sélecteur d'entreprise pour super admins
+- ✅ Configuration par tenant
 
-## 🚀 Installation et Démarrage
+### 👥 Gestion des Utilisateurs
+- ✅ CRUD complet des utilisateurs
+- ✅ Système de rôles et permissions granulaires
+- ✅ Interface de gestion des permissions
+- ✅ Quotas par plan tarifaire
+
+### ⚙️ Paramètres Multi-Niveaux
+- ✅ Paramètres système (Super Admin)
+- ✅ Paramètres entreprise (branding, services)
+- ✅ Préférences utilisateur (thème, langue)
+
+### 🎨 Interface Utilisateur
+- ✅ Design responsive mobile-first
+- ✅ Thèmes adaptatifs (clair/sombre/système)
+- ✅ Multi-langues (FR/EN + autres)
+- ✅ Composants réutilisables avec Shadcn/ui
+
+### 📊 DataTables Avancées
+- ✅ Pagination configurable
+- ✅ Recherche temps réel
+- ✅ Tri multi-colonnes
+- ✅ Filtres avancés
+- ✅ Actions en lot
+
+## 🛠️ Stack Technique
+
+### Backend
+- **Runtime**: Node.js 18+
+- **Framework**: Express.js + TypeScript
+- **Base de données**: PostgreSQL 15 avec RLS
+- **Cache**: Redis 7
+- **Authentification**: JWT + 2FA (TOTP)
+- **Validation**: Joi
+- **Logs**: Winston
+
+### Frontend
+- **Framework**: Next.js 14+ (App Router)
+- **Langage**: TypeScript
+- **Styling**: Tailwind CSS
+- **Composants**: Shadcn/ui
+- **État**: Zustand
+- **Formulaires**: React Hook Form + Zod
+
+### Infrastructure
+- **Conteneurisation**: Docker + Docker Compose
+- **Proxy**: Nginx (production)
+- **Monitoring**: Health checks intégrés
+
+## 🚀 Installation Rapide
 
 ### Prérequis
-- Node.js 18+
 - Docker et Docker Compose
-- PostgreSQL 15+
-- Redis 7+
+- Git
 
-### Installation Rapide
+### 1. Cloner le projet
 ```bash
-# Cloner le repository
 git clone <repository-url>
-cd base-project
+cd saas-app
+```
 
-# Démarrer avec Docker
+### 2. Lancer l'application
+```bash
+# Démarrer tous les services
 docker-compose up -d
 
-# L'application sera disponible sur :
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:3001
-# Base de données: localhost:5432
-# Redis: localhost:6379
+# Voir les logs
+docker-compose logs -f
 ```
 
-### Installation Manuelle
+### 3. Accéder à l'application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001
+- **Adminer (DB)**: http://localhost:8080
+- **Redis Commander**: http://localhost:8081
 
-#### 1. Base de données
-```bash
-# Créer la base de données
-createdb saas_app
+## 🔑 Comptes de Test
 
-# Exécuter les migrations
-cd database
-psql -d saas_app -f migrations/001_create_companies.sql
-psql -d saas_app -f migrations/002_create_users.sql
-# ... autres migrations
+### Super Admin
+- **Email**: superadmin@saas-app.com
+- **Mot de passe**: admin123
+- **Accès**: Toutes les entreprises
 
-# Charger les données de test
-psql -d saas_app -f seeds/companies.sql
-psql -d saas_app -f seeds/users.sql
-```
+### ACME Corp (Plan Enterprise)
+- **Admin**: admin@acme-corp.com / admin123
+- **Manager**: manager@acme-corp.com / admin123
+- **User**: user@acme-corp.com / admin123
 
-#### 2. Backend
-```bash
-cd backend
-npm install
-cp .env.example .env
-# Configurer les variables d'environnement
-npm run dev
-```
+### Tech Startup (Plan Professional)
+- **Admin**: admin@tech-startup.com / admin123
+- **Dev**: dev@tech-startup.com / admin123
 
-#### 3. Frontend
-```bash
-cd frontend
-npm install
-cp .env.local.example .env.local
-# Configurer les variables d'environnement
-npm run dev
-```
+### Consulting Firm (Plan Basic)
+- **Admin**: admin@consulting-firm.com / admin123
 
-## 🔐 Fonctionnalités Principales
-
-### Authentification & Sécurité
-- ✅ Connexion/déconnexion sécurisée
-- ✅ 2FA/MFA obligatoire avec QR codes
-- ✅ Récupération mot de passe par email
-- ✅ Sessions JWT avec refresh tokens
-- ✅ Protection CSRF et rate limiting
-
-### Multi-Entreprise
-- ✅ Isolation complète des données (RLS)
-- ✅ Sélecteur d'entreprise pour super admin
-- ✅ Paramètres par entreprise (branding, services)
-- ✅ Quotas et limites configurables
-
-### Permissions Granulaires
-- ✅ Format `service.table.action`
-- ✅ Rôles prédéfinis et personnalisés
-- ✅ Interface de gestion intuitive
-- ✅ Validation automatique des accès
-
-### Interface Utilisateur
-- ✅ Design responsive mobile-first
-- ✅ Thème adaptatif (clair/sombre)
-- ✅ DataTables avec filtres avancés
-- ✅ Composants réutilisables Shadcn/ui
-
-### Fonctionnalités Avancées
-- ✅ Générateur de codes automatique
-- ✅ Multi-langues par entreprise
-- ✅ PWA avec support offline
-- ✅ Système de paramètres à 3 niveaux
-
-## 📊 Structure du Projet
+## 📁 Structure du Projet
 
 ```
-project/
-├── frontend/                 # Application Next.js 14+
-│   ├── app/                 # App Router pages
-│   ├── components/          # Composants réutilisables
-│   ├── lib/                 # Utilitaires et configurations
-│   └── public/              # Assets statiques
+saas-app/
 ├── backend/                 # API Node.js + Express
-│   ├── services/            # Services métier
-│   ├── middleware/          # Middlewares Express
-│   ├── routes/              # Routes API
-│   └── utils/               # Utilitaires
-├── database/                # Base de données
-│   ├── migrations/          # Migrations SQL
-│   └── seeds/               # Données de test
-├── docker/                  # Configuration Docker
-└── docs/                    # Documentation
+│   ├── src/
+│   │   ├── config/         # Configuration (DB, Redis)
+│   │   ├── middleware/     # Middlewares (auth, tenant, etc.)
+│   │   ├── routes/         # Routes API
+│   │   ├── utils/          # Utilitaires
+│   │   └── server.ts       # Point d'entrée
+│   ├── Dockerfile
+│   └── package.json
+├── frontend/               # Application Next.js
+│   ├── src/
+│   │   ├── app/           # App Router Next.js 14
+│   │   ├── components/    # Composants réutilisables
+│   │   ├── lib/          # Utilitaires et configuration
+│   │   └── types/        # Types TypeScript
+│   ├── Dockerfile
+│   └── package.json
+├── database/
+│   ├── migrations/        # Migrations SQL
+│   └── seeds/            # Données de test
+├── scripts/              # Scripts utilitaires
+├── docker-compose.yml    # Configuration Docker
+└── README.md
 ```
 
 ## 🔧 Configuration
 
 ### Variables d'Environnement
 
-#### Backend (.env)
+Créer un fichier `.env` dans le répertoire `backend/` :
+
 ```env
 # Base de données
-DATABASE_URL=postgresql://user:password@localhost:5432/saas_app
-REDIS_URL=redis://localhost:6379
+DATABASE_URL=postgresql://saas_user:saas_password@localhost:5432/saas_app
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=redis_password
 
 # JWT
-JWT_SECRET=your-super-secret-jwt-key
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+JWT_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=your-super-secret-refresh-key
+JWT_REFRESH_EXPIRES_IN=7d
 
-# Email (pour 2FA et récupération)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+# Sécurité
+BCRYPT_ROUNDS=12
+MAX_LOGIN_ATTEMPTS=5
+ACCOUNT_LOCKOUT_TIME=1800000
+
+# CORS
+CORS_ORIGIN=http://localhost:3000
 
 # 2FA
 TOTP_SERVICE_NAME=SaaS App
 TOTP_ISSUER=Your Company
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
 ```
 
-#### Frontend (.env.local)
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_APP_NAME=SaaS App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+## 🏗️ Architecture
+
+### Multi-Tenant avec RLS
+```sql
+-- Exemple de politique RLS
+CREATE POLICY tenant_isolation ON users
+  FOR ALL TO app_role
+  USING (company_id = current_setting('app.current_tenant')::uuid);
+```
+
+### Permissions Granulaires
+Format : `service.resource.action`
+- `users.users.create` - Créer un utilisateur
+- `crm.clients.read` - Voir les clients
+- `settings.company.update` - Modifier les paramètres
+
+### Services Modulaires
+```typescript
+const availableServices = {
+  'auth': { required: true },
+  'users': { required: true },
+  'crm': { required: false },
+  'inventory': { required: false },
+  'invoicing': { required: false },
+  'reporting': { required: false }
+};
 ```
 
 ## 🧪 Tests
 
 ```bash
-# Backend
+# Tests backend
 cd backend
 npm test
-npm run test:coverage
 
-# Frontend
+# Tests frontend
 cd frontend
 npm test
-npm run test:e2e
+
+# Tests d'intégration
+docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+```
+
+## 📊 Monitoring
+
+### Health Checks
+- **Backend**: GET /health
+- **Détaillé**: GET /health/detailed
+
+### Logs
+```bash
+# Logs en temps réel
+docker-compose logs -f backend
+
+# Logs spécifiques
+docker-compose logs -f postgres redis
+```
+
+## 🔒 Sécurité
+
+### Fonctionnalités Implémentées
+- ✅ Row Level Security (RLS)
+- ✅ JWT avec refresh tokens
+- ✅ Rate limiting par IP et utilisateur
+- ✅ Protection CSRF
+- ✅ Validation des entrées
+- ✅ Hashage sécurisé des mots de passe
+- ✅ 2FA avec TOTP
+- ✅ Audit logs
+
+### Bonnes Pratiques
+- Principe du moindre privilège
+- Isolation des données par tenant
+- Chiffrement des données sensibles
+- Sessions sécurisées
+- Protection contre les attaques communes
+
+## 🚀 Déploiement
+
+### Production avec Docker
+```bash
+# Build des images de production
+docker-compose -f docker-compose.prod.yml build
+
+# Déploiement
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Variables de Production
+```env
+NODE_ENV=production
+JWT_SECRET=<strong-random-secret>
+DATABASE_URL=<production-db-url>
+REDIS_URL=<production-redis-url>
 ```
 
 ## 📈 Performance
 
-- **Temps de réponse** : < 200ms pour les requêtes standard
-- **Couverture de tests** : > 80% du backend
-- **Sécurité** : Audit automatisé sans failles critiques
-- **Mobile** : Interface parfaitement responsive
-- **PWA** : Fonctionnement offline vérifié
+### Optimisations Implémentées
+- Cache Redis pour sessions et données fréquentes
+- Index optimisés pour multi-tenant
+- Pagination efficace
+- Compression gzip
+- Rate limiting intelligent
+- Connection pooling
 
-## 🔒 Sécurité
-
-### Mesures Implémentées
-- Row Level Security (RLS) PostgreSQL
-- Validation stricte des accès cross-tenant
-- Protection contre les attaques CSRF
-- Rate limiting par entreprise
-- Chiffrement des données sensibles
-- Audit trail complet
-
-### Quotas et Limites
-- CPU : Max 20% par entreprise
-- RAM : Limites par plan tarifaire
-- Stockage : Quotas configurables
-- Requêtes : Rate limiting intelligent
-
-## 📚 Documentation
-
-- [Guide d'Installation](docs/installation.md)
-- [Documentation API](docs/api.md)
-- [Guide Administrateur](docs/admin.md)
-- [Architecture Technique](docs/architecture.md)
-- [Guide de Développement](docs/development.md)
+### Métriques
+- Temps de réponse API < 200ms
+- Support de 1000+ utilisateurs simultanés
+- Isolation parfaite entre tenants
 
 ## 🤝 Contribution
 
@@ -229,18 +294,37 @@ npm run test:e2e
 4. Push vers la branche (`git push origin feature/amazing-feature`)
 5. Ouvrir une Pull Request
 
-## 📄 Licence
+## 📝 Licence
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ## 🆘 Support
 
-Pour toute question ou problème :
-- 📧 Email : support@yourcompany.com
-- 📖 Documentation : [docs.yourcompany.com](https://docs.yourcompany.com)
-- 🐛 Issues : [GitHub Issues](https://github.com/yourcompany/base-project/issues)
+- **Documentation**: Voir le dossier `docs/`
+- **Issues**: Utiliser les GitHub Issues
+- **Discussions**: GitHub Discussions
+
+## 🎯 Roadmap
+
+### Phase 1 ✅
+- [x] Architecture multi-tenant
+- [x] Authentification 2FA
+- [x] Système de permissions
+- [x] Interface d'administration
+
+### Phase 2 🚧
+- [ ] Module CRM complet
+- [ ] Système de notifications
+- [ ] API webhooks
+- [ ] Rapports avancés
+
+### Phase 3 📋
+- [ ] Mobile app (React Native)
+- [ ] Intégrations tierces
+- [ ] Analytics avancés
+- [ ] Marketplace de plugins
 
 ---
 
-**Développé avec ❤️ pour une expérience SaaS exceptionnelle**
+**Développé avec ❤️ pour les équipes qui veulent du SaaS de qualité entreprise**
 

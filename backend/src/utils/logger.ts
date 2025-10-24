@@ -71,25 +71,25 @@ const consoleFormat = winston.format.combine(
 const transports: winston.transport[] = [];
 
 // Transport console (toujours actif en développement)
-if (process.env.NODE_ENV !== 'production') {
+if (process.env['NODE_ENV'] !== 'production') {
   transports.push(
     new winston.transports.Console({
       format: consoleFormat,
-      level: process.env.LOG_LEVEL || 'debug',
+      level: process.env['LOG_LEVEL'] || 'debug',
     })
   );
 }
 
 // Transport fichier pour la production
-if (process.env.NODE_ENV === 'production' || process.env.LOG_FILE) {
-  const logDir = process.env.LOG_DIR || './logs';
-  const logFile = process.env.LOG_FILE || path.join(logDir, 'app.log');
+if (process.env['NODE_ENV'] === 'production' || process.env['LOG_FILE']) {
+  const logDir = process.env['LOG_DIR'] || './logs';
+  const logFile = process.env['LOG_FILE'] || path.join(logDir, 'app.log');
   
   transports.push(
     new winston.transports.File({
       filename: logFile,
       format: customFormat,
-      level: process.env.LOG_LEVEL || 'info',
+      level: process.env['LOG_LEVEL'] || 'info',
       maxsize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5,
       tailable: true,
@@ -112,7 +112,7 @@ if (process.env.NODE_ENV === 'production' || process.env.LOG_FILE) {
 // Créer le logger
 export const logger = winston.createLogger({
   levels: customLevels.levels,
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  level: process.env['LOG_LEVEL'] || (process.env['NODE_ENV'] === 'production' ? 'info' : 'debug'),
   format: customFormat,
   transports,
   // Ne pas quitter le processus en cas d'erreur de log
@@ -248,7 +248,7 @@ export function createLoggerMiddleware() {
 // ========================================
 
 // Désactiver les logs pendant les tests
-if (process.env.NODE_ENV === 'test') {
+if (process.env['NODE_ENV'] === 'test') {
   logger.transports.forEach((transport) => {
     transport.silent = true;
   });
@@ -277,4 +277,3 @@ export default {
   logJobEvent,
   createLoggerMiddleware,
 };
-
